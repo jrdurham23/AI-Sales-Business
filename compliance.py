@@ -26,11 +26,21 @@ EMAIL_FOOTER_TEMPLATE = """--
 {sender_name} | {company_name}
 {postal_address}
 
-You're receiving this one-time note because your business is publicly
-listed without a website. If you'd rather not hear from us, reply
-"unsubscribe" or click here and we'll never contact you again:
-{unsubscribe_link}
+You're receiving this note because your business is publicly listed
+without a current website. If you'd rather not hear from us, just reply
+"unsubscribe" and we'll never contact you again.{unsubscribe_extra}
 """
+
+
+def build_footer(sender_name, company_name, postal_address, unsubscribe_link=""):
+    """Render the CAN-SPAM footer. postal_address is legally required."""
+    extra = f"\nYou can also opt out here: {unsubscribe_link}" if unsubscribe_link else ""
+    return EMAIL_FOOTER_TEMPLATE.format(
+        sender_name=sender_name,
+        company_name=company_name,
+        postal_address=postal_address,
+        unsubscribe_extra=extra,
+    )
 
 # Substrings whose absence from an outreach email means it is not
 # CAN-SPAM compliant. Postal address can't be pattern-matched reliably,

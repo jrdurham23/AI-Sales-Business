@@ -1,5 +1,7 @@
 import argparse
+import datetime
 import os
+import shutil
 import sys
 
 from dotenv import load_dotenv
@@ -8,6 +10,8 @@ from rich.table import Table
 
 import compliance
 import db
+import drafts
+import site_builder
 import workflow
 from lead_generator import generate_leads
 
@@ -51,11 +55,12 @@ def cmd_generate(args):
 
 def _lead_table(leads, title):
     table = Table(title=title, show_lines=False)
-    for col in ("ID", "Business", "Status", "Phone", "Email", "Next action", "Due"):
+    for col in ("ID", "Score", "Business", "Status", "Phone", "Email", "Next action", "Due"):
         table.add_column(col)
     for l in leads:
         table.add_row(
-            str(l["id"]), l["business_name"] or "", l["status"] or "NEW",
+            str(l["id"]), str(l["score"] or ""),
+            l["business_name"] or "", l["status"] or "NEW",
             l["phone"] or "", l["email"] or "",
             l["next_action"] or "", l["next_action_at"] or "",
         )
@@ -130,6 +135,39 @@ def cmd_outreach_reply(args):
                       "Then: python main.py project create " + str(args.id))
 
 
+def cmd_outreach_draft(args):
+    load_dotenv()
+    conn = db.connect(args.db)
+    lead = workflow.get_lead(conn, args.id)
+    if lead["status"] in ("SUPPRESSED", "NOT_INTERESTED", "DEAD", "CLIENT"):
+        console.print(f"[red]✗ Lead {args.id} has status {lead['status']} — "
+                      "no further outreach.[/red]")
+        sys.exit(1)
+
+    touch = args.touch or workflow.outbound_touch_count(conn, args.id) + 1
+    if touch > workflow.MAX_TOUCHES:
+        console.print(f"[red]✗ Sequence complete ({workflow.MAX_TOUCHES} touches sent).[/red]")
+        sys.exit(1)
+
+    try:
+        draft = drafts.build_draft(lead, touch)
+    except drafts.DraftError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        sys.exit(1)
+
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(draft)
+        console.print(f"[green]Touch {touch} draft written to {args.out}.[/green]")
+    else:
+        console.print(f"[dim]— Touch {touch}/{workflow.MAX_TOUCHES} draft for "
+                      f"lead {args.id} ({lead['business_name']}) —[/dim]\n")
+        print(draft)
+    console.print(f"\n[dim]After sending, record it:[/dim] "
+                  f"python main.py outreach log {args.id} --channel email "
+                  f"--summary \"touch {touch}\"")
+
+
 def cmd_outreach_checkemail(args):
     body = sys.stdin.read() if args.file == "-" else open(args.file, encoding="utf-8").read()
     problems = compliance.required_footer_problems(body)
@@ -200,6 +238,94 @@ def cmd_project_set(args):
     console.print(f"[green]Project {args.id} updated — status {row['status']}.[/green]")
 
 
+# ── site builder ──────────────────────────────────────────────────────────────
+
+def cmd_site_brief(args):
+    example = site_builder.TEMPLATE_DIR / "brief.example.json"
+    target = args.out
+    if os.path.exists(target) and not args.force:
+        console.print(f"[red]✗ {target} already exists (use --force to overwrite).[/red]")
+        sys.exit(1)
+    shutil.copyfile(example, target)
+    console.print(f"[green]Blank brief written to {target} — fill it in from the "
+                  "client's intake answers, then:[/green]")
+    console.print(f"  python main.py site build {target}")
+
+
+def cmd_site_build(args):
+    try:
+        out = site_builder.build_site(args.brief, args.out)
+    except site_builder.BriefError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        sys.exit(1)
+    console.print(f"[green]✓ Site built at {out}/[/green] — open {out}/index.html "
+                  "to review, then upload the folder to your static host.")
+    if args.project:
+        conn = db.connect(args.db)
+        workflow.update_project(conn, args.project, status="BUILDING",
+                                notes=f"Built to {out}")
+        console.print(f"[dim]Project {args.project} marked BUILDING.[/dim]")
+
+
+# ── stats & backup ────────────────────────────────────────────────────────────
+
+def cmd_stats(args):
+    conn = db.connect(args.db)
+    lead_counts = dict(conn.execute(
+        "SELECT COALESCE(status, 'NEW'), COUNT(*) FROM leads GROUP BY 1"
+    ).fetchall())
+    project_counts = dict(conn.execute(
+        "SELECT status, COUNT(*) FROM projects GROUP BY 1"
+    ).fetchall())
+    suppressed = conn.execute("SELECT COUNT(*) FROM suppression_list").fetchone()[0]
+    touches = conn.execute(
+        "SELECT COUNT(*) FROM outreach_log WHERE direction = 'out'"
+    ).fetchone()[0]
+
+    table = Table(title="Lead funnel")
+    table.add_column("Stage")
+    table.add_column("Count", justify="right")
+    for status in db.LEAD_STATUSES:
+        table.add_row(status, str(lead_counts.get(status, 0)))
+    console.print(table)
+
+    contacted = sum(lead_counts.get(s, 0) for s in
+                    ("CONTACTED", "FOLLOW_UP", "INTERESTED", "CLIENT",
+                     "NOT_INTERESTED", "DEAD"))
+    interested = lead_counts.get("INTERESTED", 0) + lead_counts.get("CLIENT", 0)
+    clients = lead_counts.get("CLIENT", 0)
+    if contacted:
+        console.print(f"\nReply-to-interest: [bold]{interested}[/bold] of "
+                      f"[bold]{contacted}[/bold] contacted "
+                      f"({100 * interested / contacted:.0f}%) · "
+                      f"clients: [bold]{clients}[/bold] · "
+                      f"outbound touches sent: [bold]{touches}[/bold]")
+    console.print(f"Suppression list size: [bold]{suppressed}[/bold]")
+
+    if project_counts:
+        ptable = Table(title="Projects")
+        ptable.add_column("Status")
+        ptable.add_column("Count", justify="right")
+        for status in db.PROJECT_STATUSES:
+            if project_counts.get(status):
+                ptable.add_row(status, str(project_counts[status]))
+        console.print(ptable)
+
+
+def cmd_backup(args):
+    if not os.path.exists(args.db):
+        console.print(f"[red]✗ No database at {args.db}.[/red]")
+        sys.exit(1)
+    os.makedirs(args.dir, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    base = os.path.splitext(os.path.basename(args.db))[0]
+    target = os.path.join(args.dir, f"{base}-{stamp}.db")
+    shutil.copyfile(args.db, target)
+    console.print(f"[green]✓ Backed up {args.db} → {target}[/green]")
+    console.print("[dim]The DB holds contacts and the legally-required suppression "
+                  "list — copy backups somewhere off this machine too.[/dim]")
+
+
 # ── today ─────────────────────────────────────────────────────────────────────
 
 def cmd_today(args):
@@ -214,6 +340,11 @@ def cmd_today(args):
     if work["due_followups"]:
         console.print(f"\n[bold yellow]⏰ Follow-ups due ({len(work['due_followups'])}):[/bold yellow]")
         console.print(_lead_table(work["due_followups"], "Due follow-ups"))
+    if work["ready_for_first_touch"]:
+        console.print(f"\n[bold blue]✉️  Qualified — send touch 1 "
+                      f"({len(work['ready_for_first_touch'])}):[/bold blue]  "
+                      "[dim]python main.py outreach draft <id>[/dim]")
+        console.print(_lead_table(work["ready_for_first_touch"], "Ready for first touch"))
     if work["stalled_projects"]:
         console.print(f"\n[bold magenta]🛑 Stalled projects — nudge the client "
                       f"({len(work['stalled_projects'])}):[/bold magenta]")
@@ -287,6 +418,11 @@ def build_parser():
                    choices=("interested", "not_interested", "unsubscribe", "neutral"))
     p.add_argument("--summary", required=True)
     p.set_defaults(func=cmd_outreach_reply)
+    p = outreach.add_parser("draft", help="Generate a personalized, compliant email draft")
+    p.add_argument("id", type=int)
+    p.add_argument("--touch", type=int, help="Touch number 1-4 (default: next in sequence)")
+    p.add_argument("--out", help="Write the draft to a file instead of printing")
+    p.set_defaults(func=cmd_outreach_draft)
     p = outreach.add_parser("check-email", help="Check an email draft for CAN-SPAM basics")
     p.add_argument("file", help="Path to the draft, or - for stdin")
     p.set_defaults(func=cmd_outreach_checkemail)
@@ -319,6 +455,25 @@ def build_parser():
     p.add_argument("--revisions", type=int, help="Revision count")
     p.add_argument("--note")
     p.set_defaults(func=cmd_project_set)
+
+    site = sub.add_parser("site", help="Build client websites from intake briefs").add_subparsers(
+        dest="subcommand", required=True)
+    p = site.add_parser("brief", help="Write a blank intake brief to fill in")
+    p.add_argument("--out", default="brief.json")
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_site_brief)
+    p = site.add_parser("build", help="Build a deployable static site from a brief")
+    p.add_argument("brief", help="Path to the filled-in brief JSON")
+    p.add_argument("--out", help="Output directory (default: builds/<business-slug>)")
+    p.add_argument("--project", type=int, help="Project ID to mark BUILDING")
+    p.set_defaults(func=cmd_site_build)
+
+    p = sub.add_parser("stats", help="Funnel metrics: leads by stage, conversion, projects")
+    p.set_defaults(func=cmd_stats)
+
+    p = sub.add_parser("backup", help="Timestamped copy of the database")
+    p.add_argument("--dir", default="backups")
+    p.set_defaults(func=cmd_backup)
 
     return parser
 

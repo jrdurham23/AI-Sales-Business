@@ -43,6 +43,7 @@ _LEAD_WORKFLOW_COLUMNS = {
     "next_action": "TEXT",
     "next_action_at": "TEXT",
     "updated_at": "TEXT",
+    "score": "INTEGER",
 }
 
 

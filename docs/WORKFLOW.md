@@ -52,14 +52,28 @@ email, and its category is one you have a template/portfolio piece for.
 
 **Email is the default cold channel.** Cold SMS requires prior express written
 consent under the TCPA and cold calls need a DNC check — the tool warns/blocks
-accordingly (see `legal/outreach-compliance.md`). Before sending a new email
-draft, check it:
+accordingly (see `legal/outreach-compliance.md`).
+
+**Don't write outreach emails by hand.** Set your sender identity in `.env`
+(`SENDER_NAME`, `COMPANY_NAME`, `POSTAL_ADDRESS`), then generate the right
+touch for the lead — personalized with their business name, area, and the
+specific gap found (no site / outdated / broken), with the CAN-SPAM footer
+already attached:
+
+```
+python main.py outreach draft 12               # next touch in the sequence
+python main.py outreach draft 12 --out d.txt   # write to a file
+```
+
+Templates live in `templates/outreach/touch1-4.txt` — edit them as you learn
+what gets replies. If you write something custom instead, check it first:
 
 ```
 python main.py outreach check-email draft.txt
 ```
 
-Log every touch — this is what schedules the next one automatically:
+Log every touch after sending — this is what schedules the next one
+automatically:
 
 ```
 python main.py outreach log 12 --channel email --summary "Intro: no-website angle"
@@ -118,16 +132,29 @@ Intake checklist (send as one email or form):
 
 ## 5. Build → review → live
 
+The first draft of the site is generated, not hand-built. Put the client's
+intake answers into a brief and build:
+
 ```
-python main.py project set 3 --status BUILDING
+python main.py site brief --out joes-brief.json    # blank brief to fill in
+python main.py site build joes-brief.json --project 3
+```
+
+That produces a complete deployable site in `builds/<client>/` — responsive
+one-pager with their services, contact details, hours, brand color, click-to-
+call CTA, LocalBusiness structured data, and the required privacy/terms pages
+already linked in the footer. Review it, customize where it earns the client
+more (photos, testimonials, extra pages), then move it through the gates:
+
+```
 python main.py project set 3 --status REVIEW --staging https://client.staging.example.com
 python main.py project set 3 --status APPROVED
 python main.py project set 3 --status LIVE --production https://clientdomain.com
 ```
 
-- Build from a per-category starter template, not from scratch (see
-  `docs/INFRASTRUCTURE.md`). Target: **first staging link within 5 business
-  days of intake**.
+- Generating the first draft means the target is easily met: **first staging
+  link within 5 business days of intake** (see `docs/INFRASTRUCTURE.md` for
+  hosting).
 - Every client site ships with a privacy policy and terms page
   (`legal/privacy-policy-template.md`, `legal/website-terms-of-use-template.md`)
   — required if the site has a contact form, and it always does.
@@ -148,7 +175,12 @@ python main.py project set 3 --status LIVE --production https://clientdomain.com
 
 ## Weekly numbers worth watching
 
+```
+python main.py stats     # funnel counts + reply-to-interest conversion
+python main.py backup    # timestamped DB copy to backups/ — run weekly, copy off-machine
+```
+
 Generated → qualified → contacted → replied → interested → paid. If replies
-are low, fix the email angle before generating more leads; if interested-but-
-not-paid is high, fix the proposal/deposit step. Volume is never the first
-fix.
+are low, fix the email angle (edit `templates/outreach/`) before generating
+more leads; if interested-but-not-paid is high, fix the proposal/deposit
+step. Volume is never the first fix.

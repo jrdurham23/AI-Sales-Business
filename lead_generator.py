@@ -18,6 +18,8 @@ from rich.console import Group
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from blocklist import FRANCHISE_BLOCKLIST
+import db as pipeline_db
+import workflow
 
 class LeadGenerator:
     def __init__(self, api_key, db_path='leads.db', csv_path='leads.csv', max_workers=10):
@@ -35,28 +37,15 @@ class LeadGenerator:
 
     def setup_db(self):
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        # Full pipeline schema (leads + workflow columns + outreach/projects
+        # tables) so generated leads drop straight into the CRM workflow.
+        pipeline_db.init_db(self.conn)
         self.cursor = self.conn.cursor()
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS leads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                business_name TEXT,
-                category TEXT,
-                address TEXT,
-                phone TEXT,
-                website_url TEXT,
-                website_status TEXT,
-                outdated_signals TEXT,
-                source TEXT,
-                date_found TEXT,
-                UNIQUE(business_name, address)
-            )
-        ''')
-        self.conn.commit()
 
     def setup_csv(self):
         file_exists = os.path.isfile(self.csv_path)
         self.csv_file = open(self.csv_path, 'a', newline='', encoding='utf-8')
-        self.fieldnames = ['business_name', 'category', 'address', 'phone', 'website_url', 'website_status', 'outdated_signals', 'source', 'date_found']
+        self.fieldnames = ['business_name', 'category', 'address', 'phone', 'email', 'website_url', 'website_status', 'outdated_signals', 'source', 'date_found']
         self.writer = csv.DictWriter(self.csv_file, fieldnames=self.fieldnames)
         if not file_exists:
             self.writer.writeheader()
@@ -156,10 +145,13 @@ class LeadGenerator:
             response = res.json()
             for feature in response.get('features', []):
                 props = feature.get('properties', {})
+                contact = props.get('contact', {}) or {}
+                raw = (props.get('datasource', {}) or {}).get('raw', {}) or {}
                 results.append({
                     'name': props.get('name', props.get('address_line1', 'Unknown')),
                     'address': props.get('formatted', 'Unknown'),
-                    'phone': props.get('contact', {}).get('phone', ''),
+                    'phone': contact.get('phone', '') or raw.get('phone', '') or raw.get('contact:phone', ''),
+                    'email': contact.get('email', '') or raw.get('email', '') or raw.get('contact:email', ''),
                     'website': props.get('website', None)
                 })
         except Exception:
@@ -194,27 +186,30 @@ class LeadGenerator:
                 status, signals = "modern", ["Found official site via DuckDuckGo"]
                 
             if status in ["none", "outdated"]:
+                email = place.get('email', '')
                 lead = {
                     'business_name': name,
                     'category': category,
                     'address': place.get('address', 'Unknown'),
                     'phone': place.get('phone', ''),
+                    'email': email,
                     'website_url': website,
                     'website_status': status,
                     'outdated_signals': ", ".join(signals),
                     'source': 'Geoapify Geocoding API',
                     'date_found': datetime.datetime.now().isoformat()
                 }
-                
+                score = workflow.compute_score(status, lead['phone'], email, category)
+
                 with self.db_lock:
                     local_leads.append(lead)
                     try:
                         self.cursor.execute('''
-                            INSERT INTO leads 
-                            (business_name, category, address, phone, website_url, website_status, outdated_signals, source, date_found)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (lead['business_name'], lead['category'], lead['address'], lead['phone'],
-                              lead['website_url'], lead['website_status'], lead['outdated_signals'], lead['source'], lead['date_found']))
+                            INSERT INTO leads
+                            (business_name, category, address, phone, email, website_url, website_status, outdated_signals, source, date_found, score)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (lead['business_name'], lead['category'], lead['address'], lead['phone'], email,
+                              lead['website_url'], lead['website_status'], lead['outdated_signals'], lead['source'], lead['date_found'], score))
                         self.conn.commit()
                         self.writer.writerow(lead)
                         self.csv_file.flush()

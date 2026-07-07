@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{BUSINESS_NAME}} — {{TAGLINE}}</title>
+<meta name="description" content="{{META_DESCRIPTION}}">
+<meta property="og:title" content="{{BUSINESS_NAME}}">
+<meta property="og:description" content="{{META_DESCRIPTION}}">
+<meta property="og:type" content="website">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "{{BUSINESS_NAME}}",
+  "description": "{{META_DESCRIPTION}}",
+  "telephone": "{{PHONE}}",
+  "email": "{{EMAIL}}",
+  "address": "{{ADDRESS}}"
+}
+</script>
+<style>
+  :root {
+    --brand: {{BRAND_COLOR}};
+    --ink: #1a2028;
+    --muted: #5b6472;
+    --bg: #ffffff;
+    --bg-alt: #f4f6f9;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); background: var(--bg); line-height: 1.6;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 1.25rem; }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e6e9ee;
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; padding-block: .85rem; }
+  .nav strong { font-size: 1.1rem; }
+  .nav a.phone { color: var(--brand); font-weight: 700; text-decoration: none; }
+
+  .hero { background: var(--bg-alt); padding: 4.5rem 0 4rem; text-align: center; }
+  .hero h1 { font-size: clamp(1.9rem, 4.5vw, 3rem); line-height: 1.15; margin-bottom: .75rem; }
+  .hero p { font-size: 1.15rem; color: var(--muted); max-width: 40rem; margin: 0 auto 1.75rem; }
+  .cta {
+    display: inline-block; background: var(--brand); color: #fff;
+    padding: .9rem 2rem; border-radius: 999px; text-decoration: none;
+    font-weight: 700; font-size: 1.05rem; transition: filter .15s;
+  }
+  .cta:hover { filter: brightness(1.1); }
+  .hero .sub { margin-top: .9rem; font-size: .95rem; color: var(--muted); }
+
+  section { padding: 3.5rem 0; }
+  section h2 { font-size: 1.7rem; margin-bottom: 1.5rem; text-align: center; }
+
+  .services ul { list-style: none; display: grid; gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .services li {
+    background: var(--bg-alt); border-radius: var(--radius);
+    padding: 1.25rem 1.4rem; font-weight: 600;
+    border-left: 4px solid var(--brand);
+  }
+
+  .about { background: var(--bg-alt); }
+  .about p { max-width: 46rem; margin: 0 auto; font-size: 1.05rem; }
+
+  .contact .grid { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .contact .card { background: var(--bg-alt); border-radius: var(--radius); padding: 1.5rem; }
+  .contact h3 { margin-bottom: .5rem; font-size: 1.05rem; }
+  .contact a { color: var(--brand); font-weight: 600; text-decoration: none; }
+  .contact .hours { white-space: pre-line; }
+
+  footer {
+    border-top: 1px solid #e6e9ee; padding: 1.75rem 0; font-size: .9rem;
+    color: var(--muted); text-align: center;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <strong>{{BUSINESS_NAME}}</strong>
+    <a class="phone" href="tel:{{PHONE_DIGITS}}">{{PHONE}}</a>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <h1>{{TAGLINE}}</h1>
+      <p>{{META_DESCRIPTION}}</p>
+      <a class="cta" href="{{CTA_HREF}}">{{CTA_TEXT}}</a>
+      <div class="sub">📍 {{ADDRESS}}</div>
+    </div>
+  </div>
+
+  <section class="services" id="services">
+    <div class="wrap">
+      <h2>What We Do</h2>
+      <ul>
+{{SERVICES_ITEMS}}
+      </ul>
+    </div>
+  </section>
+
+  <section class="about" id="about">
+    <div class="wrap">
+      <h2>About {{BUSINESS_NAME}}</h2>
+      <p>{{ABOUT}}</p>
+    </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <div class="wrap">
+      <h2>Get In Touch</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Call or Email</h3>
+          <p><a href="tel:{{PHONE_DIGITS}}">{{PHONE}}</a><br>
+             <a href="mailto:{{EMAIL}}">{{EMAIL}}</a></p>
+        </div>
+        <div class="card">
+          <h3>Visit Us</h3>
+          <p>{{ADDRESS}}<br>
+             <a href="https://www.google.com/maps/search/?api=1&query={{MAPS_QUERY}}"
+                target="_blank" rel="noopener">Get directions</a></p>
+        </div>
+        <div class="card">
+          <h3>Hours</h3>
+          <p class="hours">{{HOURS}}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    © {{YEAR}} {{BUSINESS_NAME}} ·
+    <a href="privacy.html">Privacy Policy</a> ·
+    <a href="terms.html">Terms of Use</a>
+  </div>
+</footer>
+
+</body>
+</html>

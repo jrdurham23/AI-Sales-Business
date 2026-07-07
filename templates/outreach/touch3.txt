@@ -1,0 +1,11 @@
+Subject: What your competitors show up with
+
+Hi {contact_name},
+
+One thing I see over and over in {area}: when someone searches for a {category} business, the companies with a clean website get the call — even when the business without one does better work.
+
+That's the whole reason I reached out to {business_name}. A simple one-page site fixes it: your services, your phone number, your reviews, loading fast on a phone.
+
+Happy to send over an example of what I'd build for you — want me to?
+
+{footer}

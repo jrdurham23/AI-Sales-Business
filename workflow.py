@@ -25,6 +25,37 @@ INTERESTED_SLA_HOURS = 4
 # (so CLI flags can be optional), CLEAR means "set the column to NULL".
 CLEAR = object()
 
+# High-ticket local trades score above walk-in retail: a plumber's site
+# pays for itself on one job, so they close faster and churn less.
+_HIGH_VALUE_CATEGORIES = (
+    "hvac", "plumb", "electric", "roof", "landscap", "auto repair",
+    "contractor", "remodel", "pest", "tree",
+)
+
+
+def compute_score(website_status, phone, email, category):
+    """0-100 priority score: how workable and valuable is this lead?"""
+    score = {"none": 40, "error": 35, "outdated": 30}.get(website_status or "", 20)
+    if phone and str(phone).strip():
+        score += 20
+    if email and str(email).strip():
+        score += 25
+    cat = (category or "").lower()
+    if any(term in cat for term in _HIGH_VALUE_CATEGORIES):
+        score += 15
+    elif cat:
+        score += 8
+    return min(score, 100)
+
+
+def rescore_lead(conn, lead_id):
+    lead = get_lead(conn, lead_id)
+    score = compute_score(lead["website_status"], lead["phone"],
+                          lead["email"], lead["category"])
+    conn.execute("UPDATE leads SET score = ? WHERE id = ?", (score, lead_id))
+    conn.commit()
+    return score
+
 
 class WorkflowError(Exception):
     """Raised for invalid transitions or blocked (non-compliant) actions."""
@@ -76,6 +107,8 @@ def update_lead(conn, lead_id, **fields):
         (*fields.values(), lead_id),
     )
     conn.commit()
+    if "email" in fields:  # contactability changed — priority changes with it
+        rescore_lead(conn, lead_id)
 
 
 def outbound_touch_count(conn, lead_id):
@@ -226,7 +259,12 @@ def today_worklist(conn):
     ).fetchall()
     due = [l for l in list_leads(conn, due=True) if l["status"] != "INTERESTED"]
     to_review = conn.execute(
-        "SELECT * FROM leads WHERE status = 'NEW' ORDER BY id LIMIT 25"
+        "SELECT * FROM leads WHERE status = 'NEW' "
+        "ORDER BY score DESC, id LIMIT 25"
+    ).fetchall()
+    ready = conn.execute(
+        "SELECT * FROM leads WHERE status = 'QUALIFIED' AND next_action_at IS NULL "
+        "ORDER BY score DESC, id"
     ).fetchall()
     stalled_cutoff = (datetime.date.today() - datetime.timedelta(days=5)).isoformat()
     stalled = conn.execute(
@@ -241,6 +279,7 @@ def today_worklist(conn):
     return {
         "hot_leads": hot,
         "due_followups": due,
+        "ready_for_first_touch": ready,
         "new_to_review": to_review,
         "stalled_projects": stalled,
         "active_projects": active,

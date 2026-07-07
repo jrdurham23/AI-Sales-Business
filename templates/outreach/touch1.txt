@@ -1,0 +1,11 @@
+Subject: Quick question about {business_name}
+
+Hi {contact_name},
+
+I was looking at {category} businesses around {area} and noticed {business_name} {gap_line}. These days that usually means missed calls — most people find a local {category} business on their phone, and if there's nothing to find, they call whoever shows up next.
+
+I build simple, fast websites for local businesses like yours: live within about a week, one flat price, and nothing for you to manage afterward.
+
+Would it be worth a quick call this week to see what that could look like for {business_name}?
+
+{footer}

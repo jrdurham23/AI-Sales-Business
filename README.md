@@ -10,12 +10,15 @@ lead-to-launch pipeline built around one SQLite database and one CLI:
 pip install -r requirements.txt
 cp .env.example .env          # add your Geoapify API key
 
-python main.py generate --zip 31401   # find leads (no/outdated websites)
+python main.py generate --zip 31401   # find leads (no/outdated websites), scored 0-100
 python main.py today                   # daily worklist: hot leads, follow-ups, stalled projects
-python main.py leads list --status NEW # review & qualify
-python main.py outreach log 12 --channel email --summary "intro"   # compliance-checked
+python main.py leads list --status NEW # review & qualify (highest score first)
+python main.py outreach draft 12       # personalized, CAN-SPAM-compliant email draft
+python main.py outreach log 12 --channel email --summary "touch 1"  # compliance-checked
 python main.py outreach reply 12 --outcome interested --summary "wants pricing"
 python main.py project create 12       # convert to client + website project
+python main.py site build brief.json   # generate the client's deployable website
+python main.py stats                   # funnel metrics
 ```
 
 | Where to look | What it covers |
@@ -29,9 +32,13 @@ contacts, calls/SMS are blocked outside the 8am–9pm TCPA window, and
 `outreach check-email` verifies drafts have opt-out language.
 
 Code layout: `main.py` (CLI) · `lead_generator.py` (Geoapify lead discovery)
-· `workflow.py` (pipeline state machine) · `compliance.py` (legal guardrails)
-· `db.py` (schema + migrations) · `finder.py` (standalone OSM-based finder,
-no API key needed).
+· `workflow.py` (pipeline state machine + lead scoring) · `compliance.py`
+(legal guardrails) · `drafts.py` (outreach draft generation from
+`templates/outreach/`) · `site_builder.py` (client sites from
+`templates/site/`) · `db.py` (schema + migrations) · `finder.py`
+(standalone OSM-based finder, no API key needed).
+
+Run the tests with `python -m unittest discover -s tests -t .`
 
 ---
 
