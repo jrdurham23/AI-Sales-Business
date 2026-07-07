@@ -127,18 +127,17 @@ Then, in order, before any build work:
 2. **Collect the deposit** (50% recommended). Move the project to
    `PAYMENT_PENDING` until it clears. **Never start building unpaid** — this
    is the payment gate.
-3. **Send the intake checklist** (below). When it's back, you have everything
-   needed to build without further back-and-forth.
+3. **Send the intake form** — attach `templates/intake.html` (or host it and
+   send the link). The client fills it in a browser in ~10 minutes and it
+   downloads a `brief-<name>.json` they email back. That file feeds
+   straight into `site build` — zero transcription:
 
-Intake checklist (send as one email or form):
-- Business name, tagline, and 2–3 sentences about the business
-- Services/products list, service area
-- Phone, email, address, hours as they should appear on the site
-- Logo + 5–10 photos (or note that stock photos are fine)
-- 2–3 websites they like
-- Primary call to action (call / book / order / directions)
-- Preferred domain name, if any
-- Any existing Google Business / Facebook pages to link
+   ```
+   python main.py site build brief-joes-plumbing.json --project 3
+   ```
+
+   Ask separately for their logo and 5–10 photos (or note that stock is
+   fine), plus any existing Google Business / Facebook pages to link.
 
 ## 5. Build → review → live
 

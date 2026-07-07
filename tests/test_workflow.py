@@ -198,6 +198,70 @@ class ProjectTests(unittest.TestCase):
             workflow.update_project(conn, pid, status="SHIPPED")
 
 
+class RevisionTests(unittest.TestCase):
+    def _project(self, conn):
+        lead_id = add_lead(conn, status="INTERESTED")
+        return workflow.create_project(conn, lead_id)
+
+    def test_revision_bumps_count_and_rebuilds(self):
+        conn = make_conn()
+        pid = self._project(conn)
+        workflow.update_project(conn, pid, status="REVIEW")
+        row, change_order = workflow.record_revision(conn, pid, "bigger logo")
+        self.assertEqual(row["status"], "BUILDING")
+        self.assertEqual(row["revision_count"], 1)
+        self.assertIn("bigger logo", row["notes"])
+        self.assertFalse(change_order)
+
+    def test_third_revision_is_change_order(self):
+        conn = make_conn()
+        pid = self._project(conn)
+        for i in range(workflow.INCLUDED_REVISIONS):
+            _, change_order = workflow.record_revision(conn, pid, f"round {i+1}")
+            self.assertFalse(change_order)
+        _, change_order = workflow.record_revision(conn, pid, "one more thing")
+        self.assertTrue(change_order)
+
+    def test_notes_accumulate(self):
+        conn = make_conn()
+        pid = self._project(conn)
+        workflow.record_revision(conn, pid, "first")
+        row, _ = workflow.record_revision(conn, pid, "second")
+        self.assertIn("first", row["notes"])
+        self.assertIn("second", row["notes"])
+
+
+class HealthTests(unittest.TestCase):
+    def test_healthy_environment(self):
+        import health, tempfile, os
+        tmp = tempfile.mkdtemp()
+        db_path = os.path.join(tmp, "h.db")
+        conn = sqlite3.connect(db_path)
+        db.init_db(conn)
+        conn.close()
+        env = {"GEOAPIFY_API_KEY": "k", "SENDER_NAME": "s",
+               "COMPANY_NAME": "c", "POSTAL_ADDRESS": "p"}
+        with mock.patch.dict("os.environ", env):
+            results = health.run_checks(db_path=db_path,
+                                        backups_dir=os.path.join(tmp, "bk"))
+        self.assertFalse(health.has_failures(results))
+        levels = [r[0] for r in results]
+        self.assertIn("OK", levels)
+
+    def test_missing_identity_warns(self):
+        import health, tempfile, os
+        tmp = tempfile.mkdtemp()
+        env = {"GEOAPIFY_API_KEY": "", "SENDER_NAME": "",
+               "COMPANY_NAME": "", "POSTAL_ADDRESS": ""}
+        with mock.patch.dict("os.environ", env):
+            results = health.run_checks(db_path=os.path.join(tmp, "none.db"),
+                                        backups_dir=os.path.join(tmp, "bk"))
+        warns = " ".join(m for l, m in results if l == "WARN")
+        self.assertIn("SENDER_NAME", warns)
+        self.assertIn("GEOAPIFY_API_KEY", warns)
+        self.assertFalse(health.has_failures(results))
+
+
 class ScoringTests(unittest.TestCase):
     def test_no_website_trade_with_full_contact_scores_high(self):
         score = workflow.compute_score("none", "912-555-0100", "a@b.c", "HVAC")

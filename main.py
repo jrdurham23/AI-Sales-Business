@@ -107,12 +107,15 @@ def cmd_leads_import(args):
 
 def cmd_leads_set(args):
     conn = db.connect(args.db)
+    notes = None
+    if args.note:  # append with a date stamp — never clobber history
+        notes = workflow.append_note(workflow.get_lead(conn, args.id), args.note)
     workflow.update_lead(
         conn, args.id,
         status=args.status,
         email=args.email,
         contact_name=args.contact,
-        notes=args.note,
+        notes=notes,
         next_action=args.next,
         next_action_at=args.due,
     )
@@ -239,15 +242,32 @@ def cmd_project_list(args):
 
 def cmd_project_set(args):
     conn = db.connect(args.db)
+    notes = None
+    if args.note:
+        row = conn.execute("SELECT * FROM projects WHERE id = ?", (args.id,)).fetchone()
+        if row:
+            notes = workflow.append_note(row, args.note)
     row = workflow.update_project(
         conn, args.id,
         status=args.status,
         staging_url=args.staging,
         production_url=args.production,
         revision_count=args.revisions,
-        notes=args.note,
+        notes=notes,
     )
     console.print(f"[green]Project {args.id} updated — status {row['status']}.[/green]")
+
+
+def cmd_project_revise(args):
+    conn = db.connect(args.db)
+    row, change_order = workflow.record_revision(conn, args.id, args.note)
+    console.print(f"[green]Revision {row['revision_count']} recorded — "
+                  f"project back to BUILDING.[/green]")
+    if change_order:
+        console.print(f"[bold yellow]⚠ This exceeds the "
+                      f"{workflow.INCLUDED_REVISIONS} included rounds — quote it "
+                      "as a paid change order (services agreement §4, rates in "
+                      "docs/PRICING.md).[/bold yellow]")
 
 
 # ── site builder ──────────────────────────────────────────────────────────────
@@ -277,6 +297,22 @@ def cmd_site_build(args):
         workflow.update_project(conn, args.project, status="BUILDING",
                                 notes=f"Built to {out}")
         console.print(f"[dim]Project {args.project} marked BUILDING.[/dim]")
+
+
+# ── doctor ────────────────────────────────────────────────────────────────────
+
+def cmd_doctor(args):
+    load_dotenv()
+    import health
+    results = health.run_checks(db_path=args.db)
+    icons = {"OK": "[green]✓[/green]", "WARN": "[yellow]⚠[/yellow]",
+             "FAIL": "[red]✗[/red]"}
+    for level, message in results:
+        console.print(f" {icons[level]} {message}")
+    if health.has_failures(results):
+        console.print("\n[red]Fix the failures above before running the pipeline.[/red]")
+        sys.exit(1)
+    console.print("\n[green]System healthy.[/green]")
 
 
 # ── stats & backup ────────────────────────────────────────────────────────────
@@ -462,6 +498,10 @@ def build_parser():
     p = project.add_parser("list")
     p.add_argument("--status")
     p.set_defaults(func=cmd_project_list)
+    p = project.add_parser("revise", help="Record a client revision request (enforces the 2-round policy)")
+    p.add_argument("id", type=int)
+    p.add_argument("--note", required=True, help="What the client asked to change")
+    p.set_defaults(func=cmd_project_revise)
     p = project.add_parser("set", help="Update a project's status/fields")
     p.add_argument("id", type=int)
     p.add_argument("--status")
@@ -482,6 +522,9 @@ def build_parser():
     p.add_argument("--out", help="Output directory (default: builds/<business-slug>)")
     p.add_argument("--project", type=int, help="Project ID to mark BUILDING")
     p.set_defaults(func=cmd_site_build)
+
+    p = sub.add_parser("doctor", help="Health check: credentials, templates, DB, backups")
+    p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("stats", help="Funnel metrics: leads by stage, conversion, projects")
     p.set_defaults(func=cmd_stats)

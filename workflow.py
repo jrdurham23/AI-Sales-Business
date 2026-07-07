@@ -148,7 +148,7 @@ def log_outreach(conn, lead_id, channel, summary):
             conn, lead_id,
             status="DEAD",
             next_action=CLEAR, next_action_at=CLEAR,
-            notes=_append_note(lead, f"Sequence complete after {touch} touches, no response."),
+            notes=append_note(lead, f"Sequence complete after {touch} touches, no response."),
         )
         return touch, None, warnings
 
@@ -335,7 +335,34 @@ def today_worklist(conn):
     }
 
 
-def _append_note(lead, note):
-    existing = lead["notes"] or ""
+def append_note(row, note):
+    """Timestamped note appended to a lead's/project's existing notes."""
+    existing = row["notes"] or ""
     stamp = datetime.date.today().isoformat()
     return (existing + "\n" if existing else "") + f"[{stamp}] {note}"
+
+
+# Included revision rounds per the services agreement; the next one is a
+# paid change order.
+INCLUDED_REVISIONS = 2
+
+
+def record_revision(conn, project_id, note):
+    """Log a client revision request: bump the count, append the note,
+    and put the project back into BUILDING.
+
+    Returns (project_row, change_order) — change_order is True when this
+    request exceeds the included rounds and should be quoted, not absorbed.
+    """
+    row = conn.execute("SELECT * FROM projects WHERE id = ?",
+                       (project_id,)).fetchone()
+    if not row:
+        raise WorkflowError(f"No project with id {project_id}.")
+    count = (row["revision_count"] or 0) + 1
+    updated = update_project(
+        conn, project_id,
+        status="BUILDING",
+        revision_count=count,
+        notes=append_note(row, f"Revision {count}: {note}"),
+    )
+    return updated, count > INCLUDED_REVISIONS
