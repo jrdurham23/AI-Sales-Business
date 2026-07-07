@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Intake Form</title>
+<style>
+  :root { --brand: #1266d8; --ink: #1a2028; --muted: #5b6472; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         color: var(--ink); line-height: 1.6; max-width: 44rem;
+         margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  .sub { color: var(--muted); margin-bottom: 2rem; }
+  label { display: block; font-weight: 600; margin: 1.25rem 0 .3rem; }
+  .hint { font-weight: 400; color: var(--muted); font-size: .88rem; }
+  input[type=text], input[type=tel], input[type=email], textarea, select {
+    width: 100%; padding: .65rem .8rem; border: 1px solid #cdd4dd;
+    border-radius: 8px; font: inherit; }
+  textarea { min-height: 5.5rem; resize: vertical; }
+  input[type=color] { width: 4rem; height: 2.4rem; padding: 2px;
+    border: 1px solid #cdd4dd; border-radius: 8px; }
+  .required::after { content: " *"; color: #c0392b; }
+  button { margin-top: 2rem; background: var(--brand); color: #fff;
+    border: 0; padding: .85rem 2rem; border-radius: 999px;
+    font: inherit; font-weight: 700; cursor: pointer; }
+  button:hover { filter: brightness(1.1); }
+  #done { display: none; margin-top: 1.5rem; padding: 1rem 1.25rem;
+    background: #eaf6ec; border: 1px solid #b9e0c0; border-radius: 8px; }
+  .error { color: #c0392b; font-size: .9rem; display: none; margin-top: .5rem; }
+</style>
+</head>
+<body>
+
+<h1>Your New Website — Quick Intake</h1>
+<p class="sub">About 10 minutes. When you finish, a small file downloads —
+just email it back to us and we'll take it from there.</p>
+
+<form id="intake" novalidate>
+  <label class="required" for="business_name">Business name</label>
+  <input type="text" id="business_name" required>
+
+  <label class="required" for="tagline">Tagline
+    <span class="hint">— one sentence, what you do and where
+    (e.g. "Fast, honest plumbing in Savannah")</span></label>
+  <input type="text" id="tagline" required>
+
+  <label class="required" for="about">About your business
+    <span class="hint">— 2–4 sentences: how long you've been at it, what
+    you're known for, what makes you different</span></label>
+  <textarea id="about" required></textarea>
+
+  <label class="required" for="services">Services
+    <span class="hint">— one per line</span></label>
+  <textarea id="services" required placeholder="Emergency repairs&#10;Water heater installation&#10;Drain cleaning"></textarea>
+
+  <label class="required" for="phone">Business phone</label>
+  <input type="tel" id="phone" required>
+
+  <label class="required" for="email">Business email</label>
+  <input type="email" id="email" required>
+
+  <label class="required" for="address">Address
+    <span class="hint">— as it should appear on the site</span></label>
+  <input type="text" id="address" required>
+
+  <label class="required" for="hours">Hours
+    <span class="hint">— one line per range</span></label>
+  <textarea id="hours" required placeholder="Mon–Fri: 7am–6pm&#10;Sat: 8am–2pm"></textarea>
+
+  <label class="required" for="cta_text">Main button on the site
+    <span class="hint">— what should visitors do first?</span></label>
+  <select id="cta_text" required>
+    <option value="Call Us Now">Call Us Now</option>
+    <option value="Call for a Free Estimate">Call for a Free Estimate</option>
+    <option value="Book an Appointment">Book an Appointment</option>
+    <option value="Get Directions">Get Directions</option>
+    <option value="Email Us">Email Us</option>
+  </select>
+
+  <label for="brand_color">Brand color
+    <span class="hint">— pick something close; we'll fine-tune</span></label>
+  <input type="color" id="brand_color" value="#1266d8">
+
+  <label for="notes">Anything else?
+    <span class="hint">— websites you like, your logo situation, a preferred
+    domain name, photos you have…</span></label>
+  <textarea id="notes"></textarea>
+
+  <button type="submit">Finish — download my answers</button>
+  <p class="error" id="err">Please fill in all required fields (marked *).</p>
+</form>
+
+<div id="done">
+  <strong>All set!</strong> A file just downloaded (it's your answers).
+  Reply to our email with that file attached — or if it's easier, just
+  paste its contents into the email. We'll send your first website preview
+  within 5 business days.
+</div>
+
+<script>
+document.getElementById('intake').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var required = ['business_name','tagline','about','services','phone',
+                  'email','address','hours','cta_text'];
+  var brief = {}, ok = true;
+  required.concat(['notes']).forEach(function (id) {
+    var el = document.getElementById(id);
+    var val = el.value.trim();
+    if (required.indexOf(id) !== -1 && !val) ok = false;
+    brief[id] = val;
+  });
+  document.getElementById('err').style.display = ok ? 'none' : 'block';
+  if (!ok) return;
+
+  brief.services = brief.services.split('\n')
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s; });
+  brief.brand_color = document.getElementById('brand_color').value;
+
+  var slug = brief.business_name.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'site';
+  var blob = new Blob([JSON.stringify(brief, null, 2)],
+                      { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'brief-' + slug + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  document.getElementById('done').style.display = 'block';
+  document.getElementById('done').scrollIntoView({ behavior: 'smooth' });
+});
+</script>
+
+</body>
+</html>

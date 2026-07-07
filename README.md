@@ -1,3 +1,48 @@
+# Arxon Solutions
+
+## 🚀 Start Here — Operating the Business Today
+
+The bulk of this README (below) is the **Axiom Outbound framework** — the
+fully-automated end-state architecture. What runs **today** is a lean
+lead-to-launch pipeline built around one SQLite database and one CLI:
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # add your Geoapify API key
+
+python main.py doctor                  # pre-flight: credentials, templates, DB, backups
+python main.py generate --zip 31401   # find leads (no/outdated websites), scored 0-100
+python main.py leads import scan.csv  # or feed in a free finder.py OSM scan
+python main.py today                   # daily worklist: hot leads, follow-ups, stalled projects
+python main.py outreach draft-due      # write every email due today into drafts/<date>/
+python main.py outreach log 12 --channel email --summary "touch 1"  # compliance-checked
+python main.py outreach reply 12 --outcome interested --summary "wants pricing"
+python main.py project create 12       # convert to client + website project
+python main.py site build brief.json   # client's deployable website from the intake form
+python main.py stats                   # funnel metrics
+```
+
+| Where to look | What it covers |
+|---|---|
+| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | The full playbook: qualify → 4-touch outreach → convert → build → launch, with SLAs |
+| [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | Hosting, domains, DNS, email deliverability, backups — lean now, upgrades into the framework below |
+| [`legal/`](legal/README.md) | **Read before first outreach.** CAN-SPAM/TCPA rules (enforced in code), client contract, privacy/terms templates for every site |
+
+Compliance is built in: the suppression list blocks sends to opted-out
+contacts, calls/SMS are blocked outside the 8am–9pm TCPA window, and
+`outreach check-email` verifies drafts have opt-out language.
+
+Code layout: `main.py` (CLI) · `lead_generator.py` (Geoapify lead discovery)
+· `workflow.py` (pipeline state machine + lead scoring) · `compliance.py`
+(legal guardrails) · `drafts.py` (outreach draft generation from
+`templates/outreach/`) · `site_builder.py` (client sites from
+`templates/site/`) · `db.py` (schema + migrations) · `finder.py`
+(standalone OSM-based finder, no API key needed).
+
+Run the tests with `python -m unittest discover -s tests -t .`
+
+---
+
 # 🏢 Axiom Outbound: Complete System Framework v4
 
 ---

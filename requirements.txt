@@ -2,4 +2,4 @@ requests
 beautifulsoup4
 rich
 python-dotenv
-
+geopy  # only used by finder.py (free OSM scanner, no API key)

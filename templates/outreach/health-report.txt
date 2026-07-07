@@ -1,0 +1,26 @@
+Subject: {business_name} — your website's monthly check-up ({month})
+
+Hi {contact_name},
+
+Quick monthly check-in on your site — everything below is already handled,
+nothing you need to do.
+
+THIS MONTH
+- Uptime: {uptime}% — your site was reachable around the clock
+- Visitors: {visitors} people viewed your site ({visitors_change} vs last month)
+- Most-viewed: {top_page}
+- Security & SSL: certificate valid, all systems patched
+- Backup: current copy stored safely off-server on {backup_date}
+
+CHANGES MADE
+{changes_made}
+
+WORTH CONSIDERING
+{suggestion}
+
+Want anything on the site updated — new photos, a price change, a holiday
+notice? Just reply to this email; small changes are included in your plan.
+
+Thanks for being with us,
+
+{footer}

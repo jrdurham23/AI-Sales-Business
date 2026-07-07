@@ -1,0 +1,9 @@
+Subject: Re: Quick question about {business_name}
+
+Hi {contact_name},
+
+Just floating this back to the top of your inbox — I reached out a few days ago about getting {business_name} a simple, professional website.
+
+No pressure at all: would a 10-minute call this week be worth it, yes or no?
+
+{footer}
