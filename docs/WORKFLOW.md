@@ -112,8 +112,10 @@ python main.py project create 12
 
 Then, in order, before any build work:
 
-1. **Send the services agreement** (`legal/client-services-agreement.md`,
-   filled in) and get it signed.
+1. **Send the proposal the same day** — `templates/outreach/proposal.txt`
+   filled in with tier pricing from `docs/PRICING.md`. On a yes, send the
+   services agreement (`legal/client-services-agreement.md`, filled in) and
+   get it signed.
 2. **Collect the deposit** (50% recommended). Move the project to
    `PAYMENT_PENDING` until it clears. **Never start building unpaid** — this
    is the payment gate.

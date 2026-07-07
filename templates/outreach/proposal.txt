@@ -1,0 +1,31 @@
+Subject: {business_name} — website proposal & next steps
+
+Hi {contact_name},
+
+Great talking with you. Here's everything in one place — short version:
+I'll build {business_name} a fast, professional website that turns phone
+searches into phone calls.
+
+WHAT YOU GET
+- A modern, mobile-first website: your services, photos, hours, reviews,
+  and a click-to-call button front and center
+- Your own domain ({domain_idea}) registered in YOUR name — you own it
+- Privacy policy and terms pages included
+- Live within {timeline} of receiving your content
+- Two rounds of revisions included
+
+PRICE
+- One-time build: ${build_price}
+- Optional care plan: ${care_price}/month — hosting, security, backups,
+  small content changes anytime, and a monthly health report
+  (cancel anytime with 30 days' notice)
+
+NEXT STEPS
+1. Reply "let's do it" and I'll send the agreement to sign online
+2. 50% deposit (${deposit}) to lock in your build slot
+3. I send a short questionnaire — 10 minutes to fill out
+4. First version in your inbox within {timeline}
+
+Questions? Just reply or call me at {your_phone}.
+
+{footer}
