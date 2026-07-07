@@ -10,14 +10,15 @@ lead-to-launch pipeline built around one SQLite database and one CLI:
 pip install -r requirements.txt
 cp .env.example .env          # add your Geoapify API key
 
+python main.py doctor                  # pre-flight: credentials, templates, DB, backups
 python main.py generate --zip 31401   # find leads (no/outdated websites), scored 0-100
+python main.py leads import scan.csv  # or feed in a free finder.py OSM scan
 python main.py today                   # daily worklist: hot leads, follow-ups, stalled projects
-python main.py leads list --status NEW # review & qualify (highest score first)
-python main.py outreach draft 12       # personalized, CAN-SPAM-compliant email draft
+python main.py outreach draft-due      # write every email due today into drafts/<date>/
 python main.py outreach log 12 --channel email --summary "touch 1"  # compliance-checked
 python main.py outreach reply 12 --outcome interested --summary "wants pricing"
 python main.py project create 12       # convert to client + website project
-python main.py site build brief.json   # generate the client's deployable website
+python main.py site build brief.json   # client's deployable website from the intake form
 python main.py stats                   # funnel metrics
 ```
 
