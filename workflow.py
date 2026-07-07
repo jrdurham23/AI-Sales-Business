@@ -9,10 +9,12 @@ The cadence rules live here so every touch automatically schedules the
 next one — the daily worklist (`today`) is computed, never hand-maintained.
 """
 
+import csv
 import datetime
 
 import compliance
 import db
+from blocklist import FRANCHISE_BLOCKLIST
 
 # Days to wait after touch N before touch N+1 (4-touch sequence).
 TOUCH_GAPS_DAYS = {1: 3, 2: 4, 3: 7}
@@ -250,6 +252,53 @@ def update_project(conn, project_id, **fields):
     )
     conn.commit()
     return conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+
+
+def import_finder_csv(conn, csv_path):
+    """Import a finder.py CSV (free OSM no-website scan) into the pipeline.
+
+    Rows where Google verification found a real website are skipped, as are
+    franchises and duplicates already in the database. Returns a dict of
+    counts: added / has_site / franchise / duplicate.
+    """
+    counts = {"added": 0, "has_site": 0, "franchise": 0, "duplicate": 0}
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames or "name" not in reader.fieldnames:
+            raise WorkflowError(
+                f"{csv_path} doesn't look like a finder.py export "
+                "(missing 'name' column)."
+            )
+        for row in reader:
+            name = (row.get("name") or "").strip()
+            if not name:
+                continue
+            found = (row.get("google_website_found") or "").strip()
+            if found.startswith("http"):
+                counts["has_site"] += 1
+                continue
+            if any(term in name.lower() for term in FRANCHISE_BLOCKLIST):
+                counts["franchise"] += 1
+                continue
+
+            phone = (row.get("phone") or "").strip()
+            email = (row.get("email") or "").strip()
+            category = (row.get("type") or "").replace("_", " ").strip()
+            address = (row.get("address") or "").strip()
+            score = compute_score("none", phone, email, category)
+
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO leads "
+                "(business_name, category, address, phone, email, "
+                " website_status, outdated_signals, source, date_found, "
+                " status, score) "
+                "VALUES (?, ?, ?, ?, ?, 'none', 'No website found', "
+                "        'finder.py (OpenStreetMap)', ?, 'NEW', ?)",
+                (name, category, address, phone, email, db.now(), score),
+            )
+            counts["added" if cur.rowcount else "duplicate"] += 1
+    conn.commit()
+    return counts
 
 
 def today_worklist(conn):

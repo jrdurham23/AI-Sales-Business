@@ -93,6 +93,18 @@ def cmd_leads_show(args):
             console.print(f"  {h['logged_at']} {arrow} {h['channel']}{outcome}: {h['summary'] or ''}")
 
 
+def cmd_leads_import(args):
+    conn = db.connect(args.db)
+    counts = workflow.import_finder_csv(conn, args.csv)
+    console.print(f"[green]✓ Imported {counts['added']} leads from {args.csv}.[/green]")
+    skipped = {k: v for k, v in counts.items() if k != "added" and v}
+    if skipped:
+        detail = ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in skipped.items())
+        console.print(f"[dim]Skipped: {detail}.[/dim]")
+    if counts["added"]:
+        console.print("[dim]Review them:[/dim] python main.py leads list --status NEW")
+
+
 def cmd_leads_set(args):
     conn = db.connect(args.db)
     workflow.update_lead(
@@ -392,6 +404,9 @@ def build_parser():
                    [s.lower() for s in db.LEAD_STATUSES])
     p.add_argument("--due", action="store_true", help="Only leads with an action due today")
     p.set_defaults(func=cmd_leads_list)
+    p = leads.add_parser("import", help="Import a finder.py CSV (free OSM scan) into the pipeline")
+    p.add_argument("csv", help="Path to the finder.py export CSV")
+    p.set_defaults(func=cmd_leads_import)
     p = leads.add_parser("show", help="Show one lead with full outreach history")
     p.add_argument("id", type=int)
     p.set_defaults(func=cmd_leads_show)

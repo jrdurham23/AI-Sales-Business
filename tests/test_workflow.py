@@ -217,6 +217,57 @@ class ScoringTests(unittest.TestCase):
         self.assertGreater(after, before)
 
 
+class ImportTests(unittest.TestCase):
+    HEADER = ("name,type,distance_m,phone,email,address,opening_hours,"
+              "lat,lon,google_website_found,osm_id,osm_type\n")
+
+    def _import(self, rows):
+        import tempfile, os
+        conn = make_conn()
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(self.HEADER)
+            f.writelines(rows)
+        try:
+            return conn, workflow.import_finder_csv(conn, path)
+        finally:
+            os.unlink(path)
+
+    def test_imports_and_scores(self):
+        conn, counts = self._import([
+            "Ghost Cafe,restaurant,120,912-555-0100,,1 Elm St,,-1,-1,,n1,node\n",
+        ])
+        self.assertEqual(counts["added"], 1)
+        lead = conn.execute("SELECT * FROM leads").fetchone()
+        self.assertEqual(lead["status"], "NEW")
+        self.assertEqual(lead["source"], "finder.py (OpenStreetMap)")
+        self.assertGreater(lead["score"], 0)
+
+    def test_skips_verified_sites_franchises_and_duplicates(self):
+        conn, counts = self._import([
+            "Has Site,shop,10,,,2 Elm St,,-1,-1,https://hassite.com,n2,node\n",
+            "McDonald's,fast_food,10,,,3 Elm St,,-1,-1,,n3,node\n",
+            "Dupe Biz,shop,10,,,4 Elm St,,-1,-1,,n4,node\n",
+            "Dupe Biz,shop,10,,,4 Elm St,,-1,-1,,n4,node\n",
+        ])
+        self.assertEqual(counts["added"], 1)
+        self.assertEqual(counts["has_site"], 1)
+        self.assertEqual(counts["franchise"], 1)
+        self.assertEqual(counts["duplicate"], 1)
+
+    def test_rejects_wrong_csv(self):
+        import tempfile, os
+        conn = make_conn()
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("foo,bar\n1,2\n")
+        try:
+            with self.assertRaises(workflow.WorkflowError):
+                workflow.import_finder_csv(conn, path)
+        finally:
+            os.unlink(path)
+
+
 class WorklistTests(unittest.TestCase):
     def test_new_leads_ordered_by_score(self):
         conn = make_conn()

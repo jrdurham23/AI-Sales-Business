@@ -30,9 +30,17 @@ python main.py generate --zip 31401
 ```
 
 Pulls businesses with no website or an outdated one, filters franchises and
-duplicates, and writes them as `NEW`. Run one ZIP/county at a time and finish
-working a batch before generating more — a worked list of 50 beats an
-untouched list of 500.
+duplicates, and writes them as `NEW` with a 0–100 priority score. Run one
+ZIP/county at a time and finish working a batch before generating more — a
+worked list of 50 beats an untouched list of 500.
+
+No Geoapify key or out of credits? `python finder.py` scans OpenStreetMap
+for free (with optional Google verification), then feed its CSV into the
+same pipeline:
+
+```
+python main.py leads import no_website_savannah_20260707.csv
+```
 
 ## 2. Qualify (daily, first 15 min after hot leads)
 
