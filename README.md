@@ -1,3 +1,40 @@
+# Arxon Solutions
+
+## 🚀 Start Here — Operating the Business Today
+
+The bulk of this README (below) is the **Axiom Outbound framework** — the
+fully-automated end-state architecture. What runs **today** is a lean
+lead-to-launch pipeline built around one SQLite database and one CLI:
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # add your Geoapify API key
+
+python main.py generate --zip 31401   # find leads (no/outdated websites)
+python main.py today                   # daily worklist: hot leads, follow-ups, stalled projects
+python main.py leads list --status NEW # review & qualify
+python main.py outreach log 12 --channel email --summary "intro"   # compliance-checked
+python main.py outreach reply 12 --outcome interested --summary "wants pricing"
+python main.py project create 12       # convert to client + website project
+```
+
+| Where to look | What it covers |
+|---|---|
+| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | The full playbook: qualify → 4-touch outreach → convert → build → launch, with SLAs |
+| [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | Hosting, domains, DNS, email deliverability, backups — lean now, upgrades into the framework below |
+| [`legal/`](legal/README.md) | **Read before first outreach.** CAN-SPAM/TCPA rules (enforced in code), client contract, privacy/terms templates for every site |
+
+Compliance is built in: the suppression list blocks sends to opted-out
+contacts, calls/SMS are blocked outside the 8am–9pm TCPA window, and
+`outreach check-email` verifies drafts have opt-out language.
+
+Code layout: `main.py` (CLI) · `lead_generator.py` (Geoapify lead discovery)
+· `workflow.py` (pipeline state machine) · `compliance.py` (legal guardrails)
+· `db.py` (schema + migrations) · `finder.py` (standalone OSM-based finder,
+no API key needed).
+
+---
+
 # 🏢 Axiom Outbound: Complete System Framework v4
 
 ---
