@@ -332,6 +332,38 @@ class ImportTests(unittest.TestCase):
             os.unlink(path)
 
 
+class ExportTests(unittest.TestCase):
+    def test_export_excludes_unsendable_and_sorts_by_score(self):
+        import csv as csv_mod, tempfile, os
+        conn = make_conn()
+        add_lead(conn, business_name="low", address="a1", status="QUALIFIED",
+                 phone="", email="low@x.com", website_status="outdated")
+        add_lead(conn, business_name="high", address="a2", status="QUALIFIED")
+        add_lead(conn, business_name="gone", address="a3", status="SUPPRESSED")
+        add_lead(conn, business_name="dead", address="a4", status="DEAD")
+        add_lead(conn, business_name="noemail", address="a5",
+                 status="QUALIFIED", email=None)
+        for lid in range(1, 6):
+            workflow.rescore_lead(conn, lid)
+
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        try:
+            count = workflow.export_leads_csv(conn, path, status="QUALIFIED",
+                                              require_email=True)
+            with open(path, encoding="utf-8") as f:
+                rows = list(csv_mod.DictReader(f))
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(count, 2)
+        self.assertEqual([r["business_name"] for r in rows], ["high", "low"])
+        names = {r["business_name"] for r in rows}
+        self.assertNotIn("gone", names)
+        self.assertNotIn("dead", names)
+        self.assertNotIn("noemail", names)
+
+
 class WorklistTests(unittest.TestCase):
     def test_new_leads_ordered_by_score(self):
         conn = make_conn()

@@ -106,6 +106,15 @@ def cmd_leads_import(args):
         console.print("[dim]Review them:[/dim] python main.py leads list --status NEW")
 
 
+def cmd_leads_export(args):
+    conn = db.connect(args.db)
+    count = workflow.export_leads_csv(conn, args.out, status=args.status,
+                                      require_email=args.with_email)
+    console.print(f"[green]✓ Exported {count} leads to {args.out}[/green] "
+                  "[dim](suppressed/dead/not-interested excluded — safe for "
+                  "sending tools)[/dim]")
+
+
 def cmd_leads_set(args):
     conn = db.connect(args.db)
     notes = None
@@ -554,6 +563,12 @@ def build_parser():
                    [s.lower() for s in db.LEAD_STATUSES])
     p.add_argument("--due", action="store_true", help="Only leads with an action due today")
     p.set_defaults(func=cmd_leads_list)
+    p = leads.add_parser("export", help="Export leads to CSV (suppressed/dead always excluded)")
+    p.add_argument("--out", default="export.csv")
+    p.add_argument("--status", help="Only this status (e.g. QUALIFIED)")
+    p.add_argument("--with-email", action="store_true",
+                   help="Only leads that have an email address")
+    p.set_defaults(func=cmd_leads_export)
     p = leads.add_parser("import", help="Import a finder.py CSV (free OSM scan) into the pipeline")
     p.add_argument("csv", help="Path to the finder.py export CSV")
     p.set_defaults(func=cmd_leads_import)
@@ -574,7 +589,8 @@ def build_parser():
         dest="subcommand", required=True)
     p = outreach.add_parser("log", help="Record an outbound touch (compliance-checked)")
     p.add_argument("id", type=int)
-    p.add_argument("--channel", required=True, choices=("email", "sms", "call", "in_person"))
+    p.add_argument("--channel", default="email",
+                   choices=("email", "sms", "call", "in_person"))
     p.add_argument("--summary", required=True)
     p.set_defaults(func=cmd_outreach_log)
     p = outreach.add_parser("reply", help="Record an inbound reply")

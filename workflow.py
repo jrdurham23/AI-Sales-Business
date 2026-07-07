@@ -301,6 +301,31 @@ def import_finder_csv(conn, csv_path):
     return counts
 
 
+EXPORT_FIELDS = ("id", "business_name", "category", "contact_name", "email",
+                 "phone", "address", "website_status", "outdated_signals",
+                 "status", "score", "next_action", "next_action_at")
+
+
+def export_leads_csv(conn, csv_path, status=None, require_email=False):
+    """Write leads to CSV for mail merge / external tools.
+
+    Suppressed and dead leads are never exported — an exported list must be
+    safe to feed to a sending tool as-is. Returns the number of rows written.
+    """
+    leads = [l for l in list_leads(conn, status=status)
+             if l["status"] not in ("SUPPRESSED", "DEAD", "NOT_INTERESTED")]
+    if require_email:
+        leads = [l for l in leads if (l["email"] or "").strip()]
+    leads.sort(key=lambda l: (l["score"] or 0), reverse=True)
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(EXPORT_FIELDS)
+        for lead in leads:
+            writer.writerow([lead[field] for field in EXPORT_FIELDS])
+    return len(leads)
+
+
 def today_worklist(conn):
     """Everything that needs a human action today, hottest first."""
     hot = conn.execute(
