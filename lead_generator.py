@@ -70,17 +70,27 @@ class LeadGenerator:
         signals = []
         try:
             headers = {'User-Agent': 'Mozilla/5.0'}
+            start = time.monotonic()
             res = self.robust_request(url, headers=headers, verify=False)
+            elapsed = time.monotonic() - start
             if not res:
                 return 'error', ['connection failed']
             if res.status_code >= 400:
                 return "error", [f"HTTP error {res.status_code}"]
-                
+
+            # Sales signals the pitch can quote directly
+            if res.url.startswith('http://'):
+                signals.append("no HTTPS (browsers flag it 'Not Secure')")
+            if elapsed > 4:
+                signals.append(f"slow load ({elapsed:.0f}s)")
+
             html = res.text
             soup = BeautifulSoup(html, 'html.parser')
-            
+
             if not soup.find('meta', attrs={'name': re.compile(r'viewport', re.I)}):
                 signals.append("no mobile responsiveness")
+            if not soup.find('title') or not soup.find('title').get_text(strip=True):
+                signals.append("missing page title (invisible to Google)")
             if 'x-shockwave-flash' in html.lower() or '.swf' in html.lower():
                 signals.append("Flash elements")
                 
