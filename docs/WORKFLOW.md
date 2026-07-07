@@ -179,6 +179,10 @@ python main.py project set 3 --status LIVE --production https://clientdomain.com
 
 - Offer the care plan (hosting, edits, backups — recurring revenue) and move
   takers to `MAINTENANCE`.
+- **Weekly:** `python main.py site check --all` — verifies every live client
+  site is up, fast, and has ≥3 weeks left on its SSL certificate. Use the
+  numbers in the monthly health report
+  (`templates/outreach/health-report.txt`).
 - Ask for a Google review and a referral at the 2-week check-in — referred
   leads convert far better than cold ones and cost nothing.
 

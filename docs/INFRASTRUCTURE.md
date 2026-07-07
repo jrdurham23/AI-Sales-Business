@@ -47,6 +47,8 @@ email from the domain clients and prospects visit.
 ## Domain + DNS runbook (per client)
 
 1. Register the domain (client's name, client's billing if possible).
+   `python main.py project domains <id>` suggests candidates and flags
+   which ones already resolve in DNS.
 2. Point nameservers at Cloudflare; add the zone to your account.
 3. Deploy the site to staging first (`<client>.pages.dev` or a subdomain of
    your staging domain); send that link for the REVIEW step.

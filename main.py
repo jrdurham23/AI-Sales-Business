@@ -12,6 +12,7 @@ import compliance
 import db
 import drafts
 import site_builder
+import site_check
 import workflow
 from lead_generator import generate_leads
 
@@ -329,6 +330,89 @@ def cmd_site_build(args):
         console.print(f"[dim]Project {args.project} marked BUILDING.[/dim]")
 
 
+def _print_site_result(r):
+    icon = "[green]✓[/green]" if r["ok"] and not r["problems"] else (
+        "[yellow]⚠[/yellow]" if r["ok"] else "[red]✗[/red]")
+    bits = []
+    if r["status_code"]:
+        bits.append(f"HTTP {r['status_code']}")
+    if r["load_seconds"] is not None:
+        bits.append(f"{r['load_seconds']}s")
+    if r["ssl_days_left"] is not None:
+        bits.append(f"SSL {r['ssl_days_left']}d left")
+    console.print(f" {icon} {r['url']}  [dim]{' · '.join(bits)}[/dim]")
+    for p in r["problems"]:
+        console.print(f"    [yellow]• {p}[/yellow]")
+
+
+def cmd_site_check(args):
+    targets = []
+    if args.all:
+        conn = db.connect(args.db)
+        rows = conn.execute(
+            "SELECT production_url FROM projects WHERE production_url IS NOT NULL "
+            "AND status IN ('LIVE', 'MAINTENANCE') ORDER BY id"
+        ).fetchall()
+        targets = [r["production_url"] for r in rows]
+        if not targets:
+            console.print("[yellow]No LIVE/MAINTENANCE projects with a "
+                          "production URL yet.[/yellow]")
+            return
+    elif args.url:
+        targets = [args.url]
+    else:
+        console.print("[red]✗ Give a URL or use --all.[/red]")
+        sys.exit(1)
+
+    problems = 0
+    for url in targets:
+        r = site_check.check_site(url)
+        _print_site_result(r)
+        problems += len(r["problems"])
+    if problems:
+        sys.exit(1)
+
+
+def cmd_project_domains(args):
+    conn = db.connect(args.db)
+    row = conn.execute("SELECT * FROM projects WHERE id = ?", (args.id,)).fetchone()
+    if not row:
+        console.print(f"[red]✗ No project with id {args.id}.[/red]")
+        sys.exit(1)
+    lead = conn.execute("SELECT * FROM leads WHERE id = ?",
+                        (row["lead_id"],)).fetchone()
+    city = ""
+    if lead and lead["address"]:
+        parts = [p.strip() for p in lead["address"].split(",") if p.strip()]
+        if len(parts) >= 2 and not any(ch.isdigit() for ch in parts[-2]):
+            city = parts[-2]
+        elif len(parts) >= 3:
+            city = parts[-3]
+
+    candidates = site_check.suggest_domains(
+        row["business_name"] or "",
+        category=(lead["category"] if lead else "") or "",
+        city=city,
+    )
+    if not candidates:
+        console.print("[yellow]Couldn't derive domain candidates from the "
+                      "business name.[/yellow]")
+        return
+    console.print(f"[bold]Domain candidates for {row['business_name']}:[/bold]")
+    for domain in candidates:
+        taken = site_check.domain_taken(domain)
+        if taken is True:
+            console.print(f" [red]✗ {domain}[/red] [dim]— taken (DNS resolves)[/dim]")
+        elif taken is False:
+            console.print(f" [green]✓ {domain}[/green] [dim]— likely available; "
+                          "confirm at your registrar[/dim]")
+        else:
+            console.print(f" [yellow]? {domain}[/yellow] [dim]— check failed, "
+                          "verify manually[/dim]")
+    console.print("[dim]Register in the CLIENT'S name "
+                  "(docs/INFRASTRUCTURE.md).[/dim]")
+
+
 # ── doctor ────────────────────────────────────────────────────────────────────
 
 def cmd_doctor(args):
@@ -531,6 +615,9 @@ def build_parser():
     p = project.add_parser("list")
     p.add_argument("--status")
     p.set_defaults(func=cmd_project_list)
+    p = project.add_parser("domains", help="Suggest domain names with DNS availability signal")
+    p.add_argument("id", type=int)
+    p.set_defaults(func=cmd_project_domains)
     p = project.add_parser("revise", help="Record a client revision request (enforces the 2-round policy)")
     p.add_argument("id", type=int)
     p.add_argument("--note", required=True, help="What the client asked to change")
@@ -555,6 +642,11 @@ def build_parser():
     p.add_argument("--out", help="Output directory (default: builds/<business-slug>)")
     p.add_argument("--project", type=int, help="Project ID to mark BUILDING")
     p.set_defaults(func=cmd_site_build)
+    p = site.add_parser("check", help="Health-check a live site (or --all client sites)")
+    p.add_argument("url", nargs="?", help="URL to check")
+    p.add_argument("--all", action="store_true",
+                   help="Check every LIVE/MAINTENANCE project's production URL")
+    p.set_defaults(func=cmd_site_check)
 
     p = sub.add_parser("doctor", help="Health check: credentials, templates, DB, backups")
     p.set_defaults(func=cmd_doctor)
