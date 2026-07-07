@@ -183,6 +183,36 @@ def cmd_outreach_draft(args):
                   f"--summary \"touch {touch}\"")
 
 
+def cmd_outreach_draft_due(args):
+    load_dotenv()
+    conn = db.connect(args.db)
+    try:
+        drafted, skipped = drafts.build_due_drafts(conn)
+    except drafts.DraftError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        sys.exit(1)
+
+    if not drafted and not skipped:
+        console.print("[green]Nothing due to draft today.[/green]")
+        return
+
+    out_dir = os.path.join(args.dir, datetime.date.today().isoformat())
+    os.makedirs(out_dir, exist_ok=True)
+    for lead, touch, text in drafted:
+        path = os.path.join(out_dir, f"lead-{lead['id']}-touch{touch}.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        console.print(f"  [green]✓[/green] #{lead['id']} {lead['business_name']} "
+                      f"(touch {touch}) → {path}")
+    for lead, reason in skipped:
+        console.print(f"  [yellow]⚠[/yellow] #{lead['id']} "
+                      f"{lead['business_name']}: {reason}")
+    if drafted:
+        console.print(f"\n[bold]{len(drafted)} drafts in {out_dir}/[/bold] — send each, "
+                      "then log it: python main.py outreach log <id> --channel email "
+                      "--summary \"touch N\"")
+
+
 def cmd_outreach_checkemail(args):
     body = sys.stdin.read() if args.file == "-" else open(args.file, encoding="utf-8").read()
     problems = compliance.required_footer_problems(body)
@@ -474,6 +504,9 @@ def build_parser():
     p.add_argument("--touch", type=int, help="Touch number 1-4 (default: next in sequence)")
     p.add_argument("--out", help="Write the draft to a file instead of printing")
     p.set_defaults(func=cmd_outreach_draft)
+    p = outreach.add_parser("draft-due", help="Draft every outreach email due today into a folder")
+    p.add_argument("--dir", default="drafts", help="Output folder (default: drafts/<today>/)")
+    p.set_defaults(func=cmd_outreach_draft_due)
     p = outreach.add_parser("check-email", help="Check an email draft for CAN-SPAM basics")
     p.add_argument("file", help="Path to the draft, or - for stdin")
     p.set_defaults(func=cmd_outreach_checkemail)

@@ -70,7 +70,7 @@ already attached:
 
 ```
 python main.py outreach draft 12               # next touch in the sequence
-python main.py outreach draft 12 --out d.txt   # write to a file
+python main.py outreach draft-due              # every email due today → drafts/<date>/
 ```
 
 Templates live in `templates/outreach/touch1-4.txt` — edit them as you learn

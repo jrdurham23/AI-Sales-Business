@@ -51,13 +51,30 @@ def _gap_line(lead):
 
 
 def _area(lead):
-    """Best-effort locality from the formatted address: '123 Main St,
-    Savannah, GA 31401, United States' -> 'Savannah'."""
+    """Best-effort locality from the formatted address.
+
+    Handles both '123 Main St, Savannah, GA 31401, United States'
+    (4+ parts: city is third from the end) and '5 Oak St, Savannah, GA'
+    (2-3 parts: city is second from the end).
+    """
     address = (lead["address"] or "").strip()
     parts = [p.strip() for p in address.split(",") if p.strip()]
-    if len(parts) >= 3:
-        return parts[-3]
-    return "your area"
+    if len(parts) >= 4:
+        candidate = parts[-3]
+    elif len(parts) >= 2:
+        candidate = parts[-2]
+    else:
+        candidate = ""
+    if not candidate or any(ch.isdigit() for ch in candidate):
+        return "your area"
+    return candidate
+
+
+def _singular(category):
+    """'restaurants' -> 'restaurant'; leaves 'HVAC', 'retail', 'glass' alone."""
+    if len(category) > 4 and category.endswith("s") and not category.endswith("ss"):
+        return category[:-1]
+    return category
 
 
 def build_draft(lead, touch):
@@ -73,7 +90,7 @@ def build_draft(lead, touch):
     draft = template_path.read_text(encoding="utf-8").format(
         business_name=lead["business_name"] or "your business",
         contact_name=lead["contact_name"] or "there",
-        category=(lead["category"] or "local").strip().lower(),
+        category=_singular((lead["category"] or "local").strip().lower()),
         area=_area(lead),
         gap_line=_gap_line(lead),
         footer=footer.rstrip(),
@@ -83,3 +100,30 @@ def build_draft(lead, touch):
     if problems:  # can only happen if a template was edited badly
         raise DraftError("Draft failed compliance check: " + " ".join(problems))
     return draft
+
+
+def build_due_drafts(conn):
+    """Draft every outreach email due today, in one pass.
+
+    Covers qualified leads awaiting touch 1 and scheduled follow-ups that
+    are due. Returns (drafted, skipped): drafted is a list of
+    (lead, touch, draft_text); skipped is a list of (lead, reason) —
+    e.g. leads with no email address, which need a call instead.
+    """
+    work = workflow.today_worklist(conn)
+    candidates = list(work["ready_for_first_touch"]) + [
+        l for l in work["due_followups"]
+        if l["status"] in ("CONTACTED", "FOLLOW_UP", "QUALIFIED")
+    ]
+
+    drafted, skipped = [], []
+    for lead in candidates:
+        if not (lead["email"] or "").strip():
+            skipped.append((lead, "no email on file — call them instead"))
+            continue
+        touch = workflow.outbound_touch_count(conn, lead["id"]) + 1
+        if touch > workflow.MAX_TOUCHES:
+            skipped.append((lead, "sequence already complete"))
+            continue
+        drafted.append((lead, touch, build_draft(lead, touch)))
+    return drafted, skipped

@@ -113,6 +113,26 @@ class DraftTests(unittest.TestCase):
             draft = drafts.build_draft(lead, 1)
         self.assertIn("Savannah", draft)
 
+    def test_area_heuristics(self):
+        cases = {
+            "123 Main St, Savannah, GA 31401, United States": "Savannah",
+            "5 Oak St, Savannah, GA": "Savannah",
+            "Savannah, GA": "Savannah",
+            "1 Elm St": "your area",
+            "": "your area",
+        }
+        for address, expected in cases.items():
+            lead = make_lead(address=address or None,
+                             business_name=f"b-{address}")
+            self.assertEqual(drafts._area(lead), expected, address)
+
+    def test_plural_category_singularized(self):
+        lead = make_lead(category="Restaurants")
+        with mock.patch.dict(os.environ, IDENTITY):
+            draft = drafts.build_draft(lead, 1)
+        self.assertIn("restaurant business", draft)
+        self.assertNotIn("restaurants business", draft)
+
     def test_missing_identity_fails_loudly(self):
         lead = make_lead()
         empty = {k: "" for k in IDENTITY}
@@ -133,6 +153,51 @@ class DraftTests(unittest.TestCase):
             for bad in (0, 5):
                 with self.assertRaises(drafts.DraftError):
                     drafts.build_draft(lead, bad)
+
+
+class DraftDueTests(unittest.TestCase):
+    def _conn(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        db.init_db(conn)
+        return conn
+
+    def _add(self, conn, **overrides):
+        fields = {
+            "business_name": "Biz", "category": "plumbing",
+            "address": "1 Main St, Savannah, GA", "phone": "912-555-0100",
+            "email": "a@b.c", "website_status": "none", "status": "QUALIFIED",
+        }
+        fields.update(overrides)
+        cols = ", ".join(fields)
+        marks = ", ".join("?" for _ in fields)
+        cur = conn.execute(f"INSERT INTO leads ({cols}) VALUES ({marks})",
+                           tuple(fields.values()))
+        conn.commit()
+        return cur.lastrowid
+
+    def test_drafts_qualified_and_due_followups(self):
+        conn = self._conn()
+        self._add(conn, business_name="Fresh", address="a1")  # touch 1 ready
+        self._add(conn, business_name="Due", address="a2", status="FOLLOW_UP",
+                  next_action_at="2020-01-01")
+        conn.execute("INSERT INTO outreach_log (lead_id, channel, direction, summary) "
+                     "VALUES (2, 'email', 'out', 't1')")
+        conn.commit()
+        with mock.patch.dict(os.environ, IDENTITY):
+            drafted, skipped = drafts.build_due_drafts(conn)
+        by_name = {lead["business_name"]: touch for lead, touch, _ in drafted}
+        self.assertEqual(by_name, {"Fresh": 1, "Due": 2})
+        self.assertEqual(skipped, [])
+
+    def test_skips_leads_without_email(self):
+        conn = self._conn()
+        self._add(conn, email="")
+        with mock.patch.dict(os.environ, IDENTITY):
+            drafted, skipped = drafts.build_due_drafts(conn)
+        self.assertEqual(drafted, [])
+        self.assertEqual(len(skipped), 1)
+        self.assertIn("no email", skipped[0][1])
 
 
 if __name__ == "__main__":
